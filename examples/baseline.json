@@ -1,0 +1,71 @@
+{
+  "tool": "pushpath",
+  "version": "0.1.0",
+  "repoDir": "examples/guarded-repo",
+  "defaultBranch": "main",
+  "defaultBranchAssumed": true,
+  "verdict": "GUARDED",
+  "paths": [
+    {
+      "key": ".github/workflows/release.yml:release:GitHub release",
+      "workflow": ".github/workflows/release.yml",
+      "job": "release",
+      "jobLine": 15,
+      "environment": null,
+      "target": "GitHub release",
+      "trigger": {
+        "kind": "push-tag",
+        "detail": "push tags v*",
+        "line": 7,
+        "reachesDefault": false
+      },
+      "releaseGated": false,
+      "evidence": [
+        {
+          "file": ".github/workflows/release.yml",
+          "line": 15,
+          "kind": "job-name",
+          "detail": "job 'release' is named for deploy/publish/release"
+        },
+        {
+          "file": ".github/workflows/release.yml",
+          "line": 23,
+          "kind": "deploy-action",
+          "detail": "GoReleaser release action (goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de)"
+        }
+      ],
+      "verdict": "GUARDED",
+      "breakers": [
+        "push tags v* gate: no push reaches this deploy job - creating a release or tag is the remaining single-account step, so protect tag and release creation"
+      ],
+      "unverifiedControls": []
+    }
+  ],
+  "findings": [
+    {
+      "rule": "secret-names",
+      "severity": "info",
+      "file": ".github/workflows/release.yml",
+      "line": 28,
+      "message": "workflow references secret names (names only, values never read): GITHUB_TOKEN"
+    },
+    {
+      "rule": "least-privilege",
+      "severity": "info",
+      "file": ".github/workflows/release.yml",
+      "line": 18,
+      "message": "job 'release' permissions grant write: contents"
+    }
+  ],
+  "unknownWorkflows": [],
+  "workflowsScanned": 1,
+  "live": {
+    "source": "none",
+    "branchProtection": "unknown",
+    "prReviewCount": null,
+    "envReviewers": {},
+    "repo": null,
+    "checkedAt": null
+  },
+  "generatedAt": "2026-11-26"
+}

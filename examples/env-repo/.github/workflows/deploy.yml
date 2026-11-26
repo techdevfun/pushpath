@@ -1,0 +1,21 @@
+# Synthetic fixture: a push-triggered deploy behind an environment.
+# Whether the path is solo depends on the environment's required
+# reviewers, which only live data can prove. Verdict must be UNKNOWN
+# without --live.
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t ghcr.io/example/app:latest .
+      - run: docker push ghcr.io/example/app:latest

@@ -1,0 +1,111 @@
+# pushpath demo - real CLI output
+# (solo-repo is a synthetic fixture; the second audit runs on the
+#  REAL ossf/scorecard checkout, commit 789a810815a4398abf14b10898b111d3ced5d94d)
+
+$ pushpath init demo-policy
+created demo-policy/pushpath.json
+Next: run 'pushpath audit .' to trace the deploy paths in this repo.
+
+$ pushpath audit examples/solo-repo
+pushpath 0.1.0 - deploy-path audit
+repo: examples/solo-repo
+default branch: main (assumed - set defaultBranch in pushpath.json to override)
+workflows scanned: 1
+live: not checked (run with --live to verify branch protection and environment reviewers)
+
+VERDICT: SOLO-PATH
+
+WORKFLOW                             JOB         TRIGGER           TARGET                VERDICT
+.github/workflows/deploy.yml        deploy       push to main      npm registry          SOLO-PATH
+  .github/workflows/deploy.yml:15 [job-name] job 'deploy' is named for deploy/publish/release
+  .github/workflows/deploy.yml:23 [deploy-command] npm publish: npm publish --access public
+  unverified: branch protection unverified - a required PR review would break this path - run with --live to confirm
+
+FINDINGS
+[medium] least-privilege .github/workflows/deploy.yml:12 - top-level permissions grant write: contents
+[info] secret-names .github/workflows/deploy.yml:25 - workflow references secret names (names only, values never read): NPM_TOKEN
+[medium] pin-actions .github/workflows/deploy.yml:18 - third-party action is not SHA-pinned (actions/checkout@v4) - a floating tag can move under you
+[medium] pin-actions .github/workflows/deploy.yml:19 - third-party action is not SHA-pinned (actions/setup-node@v4) - a floating tag can move under you
+[medium] env-approver .github/workflows/deploy.yml:15 - deploy job 'deploy' has no environment - nothing stands between a push and production
+
+summary: 1 deploy path(s) - 1 SOLO-PATH, 0 GUARDED, 0 UNKNOWN
+exit: 1
+
+# --- real repo: ossf/scorecard (17 workflows, tag-gated deploys) ---
+$ pushpath audit .
+pushpath 0.1.0 - deploy-path audit
+repo: .
+default branch: main
+workflows scanned: 17
+live: not checked (run with --live to verify branch protection and environment reviewers)
+
+VERDICT: GUARDED
+
+WORKFLOW                             JOB         TRIGGER           TARGET                VERDICT
+.github/workflows/goreleaser.yaml   goreleaser   push tags *       GitHub release        GUARDED
+  .github/workflows/goreleaser.yaml:29 [job-name] job 'goreleaser' is named for deploy/publish/release
+  .github/workflows/goreleaser.yaml:56 [deploy-action] GoReleaser release action (goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de)
+  breaks: push tags * gate: no push reaches this deploy job - creating a release or tag is the remaining single-account step, so protect tag and release creation
+
+.github/workflows/publishimage.yml  publishimage push tags v*      container registry    GUARDED
+  .github/workflows/publishimage.yml:29 [job-name] job 'publishimage' is named for deploy/publish/release
+  .github/workflows/publishimage.yml:68 [deploy-command] cosign sign (release signing): cosign sign --yes ghcr.io/${{github.repository_owner}}/scorecard:${{ github.sha 
+  breaks: push tags v* gate: no push reaches this deploy job - creating a release or tag is the remaining single-account step, so protect tag and release creation
+
+FINDINGS
+[info] least-privilege .github/workflows/codeql-analysis.yml:45 - job 'analyze' permissions grant write: security-events
+[info] secret-names .github/workflows/gitlab.yml:80 - workflow references secret names (names only, values never read): GITLAB_TOKEN
+[info] least-privilege .github/workflows/gitlab.yml:34 - job 'gitlab-integration-trusted' permissions grant write: id-token
+[info] secret-names .github/workflows/goreleaser.yaml:62 - workflow references secret names (names only, values never read): GITHUB_TOKEN
+[info] least-privilege .github/workflows/goreleaser.yaml:33 - job 'goreleaser' permissions grant write: contents
+[medium] pin-actions .github/workflows/goreleaser.yaml:80 - third-party action is not SHA-pinned (slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0) - a floating tag can move under you
+[info] least-privilege .github/workflows/goreleaser.yaml:77 - job 'provenance' permissions grant write: id-token, contents
+[info] secret-names .github/workflows/integration.yml:69 - workflow references secret names (names only, values never read): GITHUB_TOKEN
+[info] least-privilege .github/workflows/links.yml:65 - job 'sweep' permissions grant write: issues
+[info] secret-names .github/workflows/main.yml:82 - workflow references secret names (names only, values never read): GH_AUTH_TOKEN
+[info] least-privilege .github/workflows/main.yml:36 - job 'unit-test' permissions grant write: id-token
+[info] secret-names .github/workflows/osps-baseline-publish.yml:87 - workflow references secret names (names only, values never read): GITHUB_TOKEN
+[medium] pin-actions .github/workflows/osps-baseline-publish.yml:66 - third-party action is not SHA-pinned (revanite-io/pvtr-publish-results/.github/workflows/publish.yml@v1) - a floating tag can move under you
+[info] least-privilege .github/workflows/osps-baseline-publish.yml:59 - job 'results' permissions grant write: id-token, security-events
+[info] secret-names .github/workflows/osps-baseline.yml:25 - workflow references secret names (names only, values never read): GH_AUTH_TOKEN
+[info] least-privilege .github/workflows/osps-baseline.yml:13 - job 'osps-assessment' permissions grant write: security-events
+[info] least-privilege .github/workflows/publishimage.yml:32 - job 'publishimage' permissions grant write: id-token, packages
+[info] secret-names .github/workflows/scdiff.yml:93 - workflow references secret names (names only, values never read): GH_AUTH_TOKEN, GITLAB_TOKEN
+[info] least-privilege .github/workflows/scdiff.yml:16 - job 'share-link' permissions grant write: pull-requests
+[info] least-privilege .github/workflows/scorecard-analysis.yml:19 - job 'analysis' permissions grant write: security-events, id-token
+[info] secret-names .github/workflows/stale.yml:36 - workflow references secret names (names only, values never read): GITHUB_TOKEN
+[info] least-privilege .github/workflows/stale.yml:25 - job 'stale' permissions grant write: issues, pull-requests
+[info] least-privilege .github/workflows/verify.yml:24 - job 'verify' permissions grant write: checks
+
+summary: 2 deploy path(s) - 0 SOLO-PATH, 2 GUARDED, 0 UNKNOWN
+
+$ pushpath check examples/solo-repo
+pushpath 0.1.0 - CI gate
+verdict: SOLO-PATH
+SOLO-PATH: .github/workflows/deploy.yml job 'deploy' - push to main -> npm registry
+  .github/workflows/deploy.yml:15 [job-name] job 'deploy' is named for deploy/publish/release
+  .github/workflows/deploy.yml:23 [deploy-command] npm publish: npm publish --access public
+  unverified: branch protection unverified - a required PR review would break this path - run with --live to confirm
+GATE FAILED: a solo deploy path exists - see 'pushpath explain solo-push'
+exit: 1
+
+$ pushpath audit --save-baseline examples/baseline.json examples/guarded-repo > /dev/null
+(baseline written: guarded-repo audit, verdict GUARDED)
+
+$ pushpath diff --baseline examples/baseline.json examples/solo-repo
+pushpath 0.1.0 - baseline diff
+baseline: examples/baseline.json (verdict GUARDED)
+current: examples/solo-repo (verdict SOLO-PATH)
+new solo path(s):
+  + .github/workflows/deploy.yml:deploy:npm registry
+REGRESSION: a new solo deploy path appeared
+exit: 1
+
+$ pushpath explain solo-push
+solo-push - One push reaches production
+
+What: A workflow deploys to production on a push to the default branch, and no breaking control is proven in the files or from live data: no required PR review, no environment approver. One compromised account can walk alone from push to production.
+
+Fix: Break the path with at least one control: (1) require pull-request review on the default branch, (2) put the deploy job behind an environment with required reviewers, or (3) deploy only on release/tag creation and protect tag and release creation. Then re-run pushpath with --live so the control is proven, not assumed.
+
+Why it matters: 1Password, 25/11/2026: an attacker with one employee's GitHub account pushed malicious code to backend services and downloaded customer admin data. The push was the incident - no second credential was needed.

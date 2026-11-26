@@ -1,0 +1,16 @@
+# Synthetic fixture: a workflow file pushpath cannot parse.
+# The duplicate `push:` key is invalid YAML. pushpath must list this
+# file as UNKNOWN, never crash, and never fail the audit for it.
+name: broken
+
+on:
+  push:
+    branches: [main]
+  push:
+    branches: [dev]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm publish
